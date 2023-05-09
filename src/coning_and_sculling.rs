@@ -48,7 +48,7 @@ impl ConingAndSculling {
         let delta_time: f32 = (time - self.time_prev).as_secs_f32();
         // println!("delta_time: {} | sample: {} | ", delta_time, self.sample);
 
-        if self.sample < self.decimation_factor {
+        if self.sample <= self.decimation_factor {
             self.time_prev = time;
             let alpha_prev: Vector3<f32> = self.alpha;
             let nu_prev: Vector3<f32> = self.nu;
@@ -76,18 +76,19 @@ impl ConingAndSculling {
             self.vel_scul = vel_scul_prev + delta_vel_scul;
 
             self.sample += 1;
-            return None;
-        } else {
+          }
+
+          if self.sample > self.decimation_factor {
             self.sample = 1;
             let vel_rot: Vector3<f32> = 0.5 * self.alpha.cross_matrix() * self.nu;
             let vel_imu: Vector3<f32> = self.nu + vel_rot + self.vel_scul;
             let rot_vec_imu: Vector3<f32> = self.alpha + self.beta;
-            self.reset(self.time_prev);
+            self.reset(time);
             return Some((vel_imu, rot_vec_imu));
-        }
+          }
+          return None;
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

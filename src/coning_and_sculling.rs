@@ -17,26 +17,26 @@ pub struct ConingAndSculling {
 impl ConingAndSculling {
     pub fn new(decimation_factor: u32, time: time::Instant) -> ConingAndSculling {
         Self {
-            decimation_factor: decimation_factor,
+            decimation_factor,
             sample: 1,
             time_prev: time,
-            alpha: Vector3::new(0.0, 0.0, 0.0),
-            delta_alpha: Vector3::new(0.0, 0.0, 0.0),
-            nu: Vector3::new(0.0, 0.0, 0.0),
-            delta_nu: Vector3::new(0.0, 0.0, 0.0),
-            beta: Vector3::new(0.0, 0.0, 0.0),
-            vel_scul: Vector3::new(0.0, 0.0, 0.0),
+            alpha: Vector3::zeros(),
+            delta_alpha: Vector3::zeros(),
+            nu: Vector3::zeros(),
+            delta_nu: Vector3::zeros(),
+            beta: Vector3::zeros(),
+            vel_scul: Vector3::zeros(),
         }
     }
 
     pub fn reset(&mut self, time: time::Instant) {
         self.time_prev = time;
         self.sample = 1;
-        self.alpha = Vector3::new(0.0, 0.0, 0.0);
-        self.delta_alpha = Vector3::new(0.0, 0.0, 0.0);
-        self.nu = Vector3::new(0.0, 0.0, 0.0);
-        self.delta_nu = Vector3::new(0.0, 0.0, 0.0);
-        self.beta = Vector3::new(0.0, 0.0, 0.0);
+        self.alpha = Vector3::zeros();
+        self.delta_alpha = Vector3::zeros();
+        self.nu = Vector3::zeros();
+        self.delta_nu = Vector3::zeros();
+        self.beta = Vector3::zeros();
     }
 
     pub fn update(
@@ -63,15 +63,15 @@ impl ConingAndSculling {
             self.nu = nu_prev + vel_incr;
 
             let delta_beta: Vector3<f32> =
-                0.5 * (alpha_prev + delta_alpha_prev / 6.0).cross_matrix() * self.delta_alpha;
+                0.5 * (alpha_prev + delta_alpha_prev / 6.0).cross(&self.delta_alpha);
             self.beta = beta_prev + delta_beta;
 
             let vel_scul_prev: Vector3<f32> = self.vel_scul;
-            let mut first_factor: Vector3<f32> = alpha_prev.cross_matrix() * delta_alpha_prev / 6.0;
-            first_factor = first_factor.cross_matrix() * self.delta_nu;
+            let mut first_factor: Vector3<f32> = alpha_prev.cross(&(delta_alpha_prev / 6.0));
+            first_factor = first_factor.cross(&self.delta_nu);
 
             let second_factor: Vector3<f32> =
-                (nu_prev + delta_nu_prev / 6.0).cross_matrix() * self.delta_alpha;
+                (nu_prev + delta_nu_prev / 6.0).cross(&self.delta_alpha);
             let delta_vel_scul: Vector3<f32> = 0.5 * (first_factor + second_factor);
             self.vel_scul = vel_scul_prev + delta_vel_scul;
 
@@ -80,7 +80,7 @@ impl ConingAndSculling {
 
           if self.sample > self.decimation_factor {
             self.sample = 1;
-            let vel_rot: Vector3<f32> = 0.5 * self.alpha.cross_matrix() * self.nu;
+            let vel_rot: Vector3<f32> = 0.5 * self.alpha.cross(&self.nu);
             let vel_imu: Vector3<f32> = self.nu + vel_rot + self.vel_scul;
             let rot_vec_imu: Vector3<f32> = self.alpha + self.beta;
             self.reset(time);

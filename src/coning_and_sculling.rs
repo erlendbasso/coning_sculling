@@ -78,8 +78,8 @@ impl ConingAndSculling {
             self.beta = beta_prev + delta_beta;
 
             let vel_scul_prev: Vector3<f32> = self.vel_scul;
-            let mut first_factor: Vector3<f32> = alpha_prev.cross(&(delta_alpha_prev / 6.0));
-            first_factor = first_factor.cross(&self.delta_nu);
+            let first_factor: Vector3<f32> =
+                (alpha_prev + delta_alpha_prev / 6.0).cross(&self.delta_nu);
 
             let second_factor: Vector3<f32> =
                 (nu_prev + delta_nu_prev / 6.0).cross(&self.delta_alpha);
@@ -180,6 +180,32 @@ mod tests {
 
         assert_vec_near(vel_imu, Vector3::zeros());
         assert_vec_near(rot_vec_imu, Vector3::zeros());
+    }
+
+    #[test]
+    fn includes_current_velocity_increment_in_sculling_correction() {
+        let t_0 = time::Instant::now();
+        let mut coning_and_sculling = ConingAndSculling::new(2, t_0);
+
+        assert_eq!(
+            coning_and_sculling.update(
+                t_0 + time::Duration::from_secs(1),
+                [1.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0],
+            ),
+            None
+        );
+
+        let (vel_imu, rot_vec_imu) = coning_and_sculling
+            .update(
+                t_0 + time::Duration::from_secs(2),
+                [0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+            )
+            .expect("second sample should complete the decimation window");
+
+        assert_vec_near(vel_imu, Vector3::new(0.0, 1.0, 13.0 / 12.0));
+        assert_vec_near(rot_vec_imu, Vector3::new(1.0, 0.0, 0.0));
     }
 
     #[test]

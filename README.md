@@ -1,92 +1,134 @@
 # coning_and_sculling
 
+`coning_and_sculling` is a small Rust library for accumulating high-rate IMU
+angular velocity and acceleration samples into lower-rate velocity and rotation
+increments with coning and sculling corrections.
 
-
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://turlab.itk.ntnu.no/turlab/coning_and_sculling.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](https://turlab.itk.ntnu.no/turlab/coning_and_sculling/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+The crate exposes one public module, `coning_and_sculling`, containing the
+`ConingAndSculling` accumulator. It uses `nalgebra::Vector3<f32>` for returned
+vectors.
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+
+Add this crate as a dependency from this repository:
+
+```toml
+[dependencies]
+coning_and_sculling = { path = "../coning_sculling" }
+```
+
+The crate currently depends on:
+
+```toml
+nalgebra = "0.34"
+```
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+```rust
+use coning_and_sculling::coning_and_sculling::ConingAndSculling;
+use std::time::{Duration, Instant};
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+let start = Instant::now();
+let mut corrector = ConingAndSculling::new(4, start);
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+for i in 1..=8 {
+    let time = start + Duration::from_millis(i * 5);
+    let angular_velocity = [0.0, 0.0, 0.1]; // rad/s, if using SI units
+    let acceleration = [0.0, 0.0, 9.81];    // m/s^2, if using SI units
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+    if let Some((velocity_increment, rotation_vector)) =
+        corrector.update(time, angular_velocity, acceleration)
+    {
+        println!("velocity increment: {velocity_increment:?}");
+        println!("rotation vector: {rotation_vector:?}");
+    }
+}
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+`update` returns `None` while samples are still being accumulated. Once
+`decimation_factor` samples have been processed, it returns:
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+- `velocity_increment`: integrated acceleration with rotational and sculling
+  correction terms.
+- `rotation_vector`: integrated angular velocity with coning correction terms.
+
+Use consistent units for all samples. With angular velocity in radians per
+second and acceleration in meters per second squared, the returned rotation
+vector is in radians and the returned velocity increment is in meters per
+second.
+
+## API Overview
+
+```rust
+pub struct ConingAndSculling {
+    pub decimation_factor: u32,
+    pub sample: u32,
+    pub time_prev: std::time::Instant,
+    pub alpha: nalgebra::Vector3<f32>,
+    pub delta_alpha: nalgebra::Vector3<f32>,
+    pub nu: nalgebra::Vector3<f32>,
+    pub delta_nu: nalgebra::Vector3<f32>,
+    pub beta: nalgebra::Vector3<f32>,
+    pub vel_scul: nalgebra::Vector3<f32>,
+}
+```
+
+### `ConingAndSculling::new`
+
+```rust
+pub fn new(decimation_factor: u32, time: std::time::Instant) -> ConingAndSculling
+```
+
+Creates a new accumulator. Pass a positive `decimation_factor` to choose how
+many IMU samples are combined into each output increment.
+
+### `ConingAndSculling::update`
+
+```rust
+pub fn update(
+    &mut self,
+    time: std::time::Instant,
+    angular_velocity: [f32; 3],
+    acceleration: [f32; 3],
+) -> Option<(nalgebra::Vector3<f32>, nalgebra::Vector3<f32>)>
+```
+
+Adds one IMU sample. The time step is computed from the difference between the
+provided `time` and the previous sample time, so timestamps should be
+monotonic.
+
+### `ConingAndSculling::reset`
+
+```rust
+pub fn reset(&mut self, time: std::time::Instant)
+```
+
+Restarts accumulation from a new timestamp.
+
+## Development
+
+Run the test suite with:
+
+```sh
+cargo test
+```
+
+Run a quick compile check with:
+
+```sh
+cargo check
+```
+
+## Project Structure
+
+```text
+src/lib.rs
+src/coning_and_sculling.rs
+Cargo.toml
+README.md
+```
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+No license file is currently included in this repository.

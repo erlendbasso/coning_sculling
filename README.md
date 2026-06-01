@@ -14,7 +14,7 @@ Add this crate as a dependency from this repository:
 
 ```toml
 [dependencies]
-coning_and_sculling = { path = "../coning_sculling" }
+coning_and_sculling = { path = "../path/to/coning_and_sculling" }
 ```
 
 The crate currently depends on:
